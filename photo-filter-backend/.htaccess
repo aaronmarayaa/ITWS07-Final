@@ -1,0 +1,6 @@
+Options -Indexes
+Require local
+
+RewriteEngine On
+RewriteRule ^api(?:/.*)?$ index.php [END]
+RewriteRule ^ - [R=404,L]
