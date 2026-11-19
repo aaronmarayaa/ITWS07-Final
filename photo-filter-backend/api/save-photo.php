@@ -3,15 +3,28 @@
 $maxPhotoBytes = 10 * 1024 * 1024;
 $contentType = explode(';', $_SERVER['CONTENT_TYPE'] ?? '', 2)[0];
 
-if (strtolower(trim($contentType)) !== 'image/png') {
-    sendJson(415, ['message' => 'Send a PNG image with Content-Type: image/png.']);
+if (strtolower(trim($contentType)) === 'multipart/form-data') {
+    $upload = $_FILES['photo'] ?? null;
+    if (!is_array($upload) || !is_int($upload['error'] ?? null)) {
+        sendJson(400, ['message' => 'The request is missing a photo upload.']);
+    }
+    if (in_array($upload['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+        sendJson(413, ['message' => 'Photos must be 10 MiB or smaller.']);
+    }
+    if ($upload['error'] !== UPLOAD_ERR_OK || !is_string($upload['tmp_name'] ?? null)
+        || !is_uploaded_file($upload['tmp_name'])) {
+        sendJson(400, ['message' => 'The photo upload could not be received. Try again.']);
+    }
+    $image = file_get_contents($upload['tmp_name'], false, null, 0, $maxPhotoBytes + 1);
+} elseif (strtolower(trim($contentType)) === 'image/png') {
+    if ((int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > $maxPhotoBytes) {
+        sendJson(413, ['message' => 'Photos must be 10 MiB or smaller.']);
+    }
+    $image = file_get_contents('php://input', false, null, 0, $maxPhotoBytes + 1);
+} else {
+    sendJson(415, ['message' => 'Send a PNG image as a photo upload or with Content-Type: image/png.']);
 }
 
-if ((int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > $maxPhotoBytes) {
-    sendJson(413, ['message' => 'Photos must be 10 MiB or smaller.']);
-}
-
-$image = file_get_contents('php://input', false, null, 0, $maxPhotoBytes + 1);
 if ($image === false || $image === '') {
     sendJson(400, ['message' => 'The request body is missing a photo.']);
 }
